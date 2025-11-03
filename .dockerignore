@@ -1,0 +1,15 @@
+# Exclude common local artifacts
+.git
+.gitignore
+bin/
+**/*.log
+**/.DS_Store
+**/*.tmp
+**/*.swp
+**/*.swo
+**/*.bak
+# Go build cache directories
+**/vendor/
+# IDE/editor settings
+.vscode/
+.idea/

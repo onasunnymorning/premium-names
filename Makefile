@@ -1,0 +1,65 @@
+# Simple Makefile to build and run the zone-names Temporal worker
+
+# Configurable variables
+IMAGE          ?= zone-names-worker
+TAG            ?= latest
+DOCKER_PLATFORM?= linux/amd64
+BIN_DIR        ?= bin
+BIN            ?= $(BIN_DIR)/worker
+PKG            ?= ./cmd/worker
+
+# Temporal defaults (override at invocation)
+TEMPORAL_ADDRESS  ?= 127.0.0.1:7233
+TEMPORAL_NAMESPACE?= default
+TEMPORAL_TASK_QUEUE?= zone-names
+LOG_LEVEL         ?= info
+
+# AWS defaults (override as needed)
+AWS_REGION  ?= us-east-1
+AWS_PROFILE ?=
+
+# Helper to pass-through AWS creds/profile if present
+AWS_ENV = \
+	-e AWS_REGION=$(AWS_REGION) \
+	$(if $(AWS_PROFILE),-e AWS_PROFILE=$(AWS_PROFILE),) \
+	$(if $(AWS_ACCESS_KEY_ID),-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID),) \
+	$(if $(AWS_SECRET_ACCESS_KEY),-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY),) \
+	$(if $(AWS_SESSION_TOKEN),-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN),)
+
+.PHONY: all build test docker-build docker-push docker-run clean tidy
+
+all: build
+
+$(BIN): ## Build the worker binary locally
+	@mkdir -p $(BIN_DIR)
+	GO111MODULE=on CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o $(BIN) $(PKG)
+
+build: $(BIN)
+
+test: ## Run all unit tests
+	go test ./...
+
+ tidy: ## Update go.sum and tidy modules
+	go mod tidy
+
+docker-build: ## Build the worker container image
+	docker buildx build --platform=$(DOCKER_PLATFORM) -t $(IMAGE):$(TAG) .
+
+docker-push: ## Push the image to the configured registry (ensure IMAGE is a registry ref)
+	docker buildx build --platform=$(DOCKER_PLATFORM) -t $(IMAGE):$(TAG) --push .
+
+docker-run: ## Run the worker container with environment configured
+	docker run --rm \
+		--name zone-names-worker \
+		-e TEMPORAL_ADDRESS=$(TEMPORAL_ADDRESS) \
+		-e TEMPORAL_NAMESPACE=$(TEMPORAL_NAMESPACE) \
+		-e TEMPORAL_TASK_QUEUE=$(TEMPORAL_TASK_QUEUE) \
+		-e LOG_LEVEL=$(LOG_LEVEL) \
+		$(AWS_ENV) \
+		$(IMAGE):$(TAG)
+
+clean: ## Remove built artifacts
+	rm -rf $(BIN_DIR)
+
+help: ## Show this help
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
