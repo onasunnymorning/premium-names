@@ -19,7 +19,7 @@ go run ./cmd/worker
 
 A docker compose stack is provided to run Temporal Server, Temporal UI, and a MinIO S3-compatible service locally.
 
-Start the stack:
+Start the stack (includes Temporal, UI, MinIO, and the worker):
 
 ```bash
 make dev-up
@@ -38,9 +38,9 @@ Stop the stack:
 make dev-down
 ```
 
-### Running the worker
+### Running the worker manually (optional)
 
-Build locally and run directly, or use the container image:
+You can still build and run the worker locally or via its container if you prefer:
 
 ```bash
 # local build
@@ -49,7 +49,7 @@ make build
 # run the worker (connecting to the compose Temporal at localhost)
 TEMPORAL_ADDRESS=127.0.0.1:7233 LOG_LEVEL=info bin/worker
 
-# or run the container
+# or run the container directly (outside compose)
 make docker-build IMAGE=zone-names-worker TAG=dev
 make docker-run IMAGE=zone-names-worker TAG=dev TEMPORAL_ADDRESS=host.docker.internal:7233
 ```
@@ -65,7 +65,7 @@ export AWS_REGION=us-east-1
 export AWS_ENDPOINT_URL_S3=http://localhost:9000
 ```
 
-MinIO will auto-create a bucket named `zone-names` via the `minio-init` one-shot job.
+MinIO will auto-create a bucket named `zone-names` via the `minio-init` one-shot job. The worker exposes Prometheus metrics at http://localhost:9090/metrics when running under compose.
 
 ## Start a workflow (example)
 

@@ -82,12 +82,16 @@ help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
 # ---- Dev stack (docker compose) ----
-.PHONY: dev-up dev-down dev-logs dev-ps
-dev-up: ## Start Temporal, UI and MinIO via docker compose
-	docker compose up -d
+.PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-restart
+dev-up: ## Start Temporal, UI, MinIO, and worker via docker compose (build if needed)
+	docker compose up -d --build
 dev-down: ## Stop and remove the dev stack
 	docker compose down -v
 dev-logs: ## Tail logs of the dev stack
 	docker compose logs -f --tail=200
 dev-ps: ## List dev stack services
 	docker compose ps
+dev-worker-logs: ## Tail only the worker service logs
+	docker compose logs -f --tail=200 worker
+dev-restart: ## Rebuild and restart just the worker service
+	docker compose up -d --build worker

@@ -29,7 +29,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DB: postgresql
+      DB: postgres12
       DB_PORT: 5432
       POSTGRES_USER: temporal
       POSTGRES_PWD: temporal
@@ -68,6 +68,28 @@ services:
     volumes:
       - minio-data:/data
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zone-names-worker:dev
+    depends_on:
+      temporal:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      TEMPORAL_TARGET_HOST: temporal:7233
+      TEMPORAL_ADDRESS: temporal:7233
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+    volumes:
+      - worker-tmp:/tmp/zone-names
+    ports:
+      - "9090:9090" # metrics
+    restart: unless-stopped
+
   # Optional one-shot service to create a default bucket on first run
   minio-init:
     image: minio/mc:latest
@@ -88,3 +110,4 @@ services:
 volumes:
   pgdata: {}
   minio-data: {}
+  worker-tmp: {}
