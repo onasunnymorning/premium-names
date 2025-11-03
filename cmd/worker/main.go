@@ -15,7 +15,8 @@ import (
 )
 
 func main() {
-	taddr := getenv("TEMPORAL_TARGET_HOST", "localhost:7233")
+	// Support both TEMPORAL_TARGET_HOST and TEMPORAL_ADDRESS for compatibility
+	taddr := getenv("TEMPORAL_TARGET_HOST", getenv("TEMPORAL_ADDRESS", "localhost:7233"))
 	ns := getenv("TEMPORAL_NAMESPACE", "default")
 	q := getenv("TEMPORAL_TASK_QUEUE", "zone-names")
 	tmpDir := getenv("ZN_TMP_DIR", "/tmp/zone-names")

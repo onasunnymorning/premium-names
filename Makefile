@@ -1,5 +1,11 @@
 # Simple Makefile to build and run the zone-names Temporal worker
 
+# Load .env if present to provide environment variables for local development
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 # Configurable variables
 IMAGE          ?= zone-names-worker
 TAG            ?= latest
@@ -9,10 +15,14 @@ BIN            ?= $(BIN_DIR)/worker
 PKG            ?= ./cmd/worker
 
 # Temporal defaults (override at invocation)
-TEMPORAL_ADDRESS  ?= 127.0.0.1:7233
+# Temporal / Worker defaults (can be provided via .env)
+TEMPORAL_TARGET_HOST ?= 127.0.0.1:7233
+TEMPORAL_ADDRESS     ?= $(TEMPORAL_TARGET_HOST)
 TEMPORAL_NAMESPACE?= default
 TEMPORAL_TASK_QUEUE?= zone-names
 LOG_LEVEL         ?= info
+METRICS_ADDR      ?= :9090
+ZN_TMP_DIR        ?= /tmp/zone-names
 
 # AWS defaults (override as needed)
 AWS_REGION  ?= us-east-1
@@ -25,6 +35,9 @@ AWS_ENV = \
 	$(if $(AWS_ACCESS_KEY_ID),-e AWS_ACCESS_KEY_ID=$(AWS_ACCESS_KEY_ID),) \
 	$(if $(AWS_SECRET_ACCESS_KEY),-e AWS_SECRET_ACCESS_KEY=$(AWS_SECRET_ACCESS_KEY),) \
 	$(if $(AWS_SESSION_TOKEN),-e AWS_SESSION_TOKEN=$(AWS_SESSION_TOKEN),)
+
+# Use .env for docker run if present
+DOCKER_ENV_FILE := $(if $(wildcard .env),--env-file .env,)
 
 .PHONY: all build test docker-build docker-push docker-run clean tidy
 
@@ -51,10 +64,14 @@ docker-push: ## Push the image to the configured registry (ensure IMAGE is a reg
 docker-run: ## Run the worker container with environment configured
 	docker run --rm \
 		--name zone-names-worker \
+		$(DOCKER_ENV_FILE) \
+		-e TEMPORAL_TARGET_HOST=$(TEMPORAL_TARGET_HOST) \
 		-e TEMPORAL_ADDRESS=$(TEMPORAL_ADDRESS) \
 		-e TEMPORAL_NAMESPACE=$(TEMPORAL_NAMESPACE) \
 		-e TEMPORAL_TASK_QUEUE=$(TEMPORAL_TASK_QUEUE) \
 		-e LOG_LEVEL=$(LOG_LEVEL) \
+		-e METRICS_ADDR=$(METRICS_ADDR) \
+		-e ZN_TMP_DIR=$(ZN_TMP_DIR) \
 		$(AWS_ENV) \
 		$(IMAGE):$(TAG)
 

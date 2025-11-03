@@ -35,6 +35,7 @@ COPY --from=builder /out/worker /worker
 # Default environment (override at runtime as needed)
 # Temporal connection
 ENV TEMPORAL_ADDRESS=127.0.0.1:7233 \
+    TEMPORAL_TARGET_HOST=127.0.0.1:7233 \
     TEMPORAL_NAMESPACE=default \
     TEMPORAL_TASK_QUEUE=zone-names \
     LOG_LEVEL=info
