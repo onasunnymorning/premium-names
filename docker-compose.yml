@@ -1,0 +1,90 @@
+# Local dev stack: Temporal Server + UI + MinIO
+# Usage:
+#   docker compose up -d
+#   open http://localhost:8080  # Temporal UI
+#   open http://localhost:9001  # MinIO Console (user/pass from .env or defaults below)
+
+name: premium-names-dev
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  temporal:
+    image: temporalio/auto-setup:1.25.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgresql
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres
+      DYNAMIC_CONFIG_FILE_PATH: /etc/temporal/dynamicconfig/temporal.yaml
+    ports:
+      - "7233:7233"   # Frontend gRPC
+    volumes:
+      - ./docker/temporal/dynamicconfig:/etc/temporal/dynamicconfig
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    depends_on:
+      - temporal
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=*
+      - TEMPORAL_UI_ENABLE_ANALYTICS=false
+    ports:
+      - "8080:8080"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
+    volumes:
+      - minio-data:/data
+
+  # Optional one-shot service to create a default bucket on first run
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      "mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
+       mc mb --ignore-existing local/zone-names &&
+       mc anonymous set public local/zone-names &&
+       echo 'minio bucket initialized'"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    restart: "no"
+
+volumes:
+  pgdata: {}
+  minio-data: {}

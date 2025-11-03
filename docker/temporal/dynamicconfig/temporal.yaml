@@ -1,0 +1,10 @@
+# Minimal dynamic config for local Temporal dev
+frontend.enableClientVersionCheck:
+  - value: false
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+history.defaultActivityRetryPolicy:
+  - value:
+      InitialIntervalInSeconds: 5
+      MaximumIntervalCoefficient: 2.0
+      MaximumAttempts: 0 # unlimited in dev
