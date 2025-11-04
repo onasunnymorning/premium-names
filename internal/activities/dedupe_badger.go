@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.temporal.io/sdk/activity"
@@ -21,7 +22,11 @@ func (a *Activities) ShardDedupeBadger(ctx context.Context, p types.ShardDedupeP
 	}
 	defer in.Close()
 
-	dbpath := filepath.Join(a.cfg.ScratchDir, filepath.Base(p.ShardURI)+".badger")
+	// Place the Badger DB alongside the shard file within the same subdirectory.
+	// This avoids mixing per-workflow temp data at the scratch root.
+	shardPath := strings.TrimPrefix(p.ShardURI, "file://")
+	dir := filepath.Dir(shardPath)
+	dbpath := filepath.Join(dir, filepath.Base(shardPath)+".badger")
 	opts := badger.DefaultOptions(dbpath).WithLogger(nil)
 	db, err := badger.Open(opts)
 	if err != nil {

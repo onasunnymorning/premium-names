@@ -31,8 +31,15 @@ func ZoneNamesWorkflow(ctx workflow.Context, p types.WorkflowParams) (types.Merg
 	mergeAO.HeartbeatTimeout = 5 * time.Minute
 	mergeCtx := workflow.WithActivityOptions(ctx, mergeAO)
 
+	// Default scratch subdir to the workflow ID if not provided.
+	if p.ScratchSubdir == "" {
+		p.ScratchSubdir = workflow.GetInfo(ctx).WorkflowExecution.ID
+	}
+
 	var part types.PartitionResult
 	if err := workflow.ExecuteActivity(ctx, "Activities.StreamPartition", p).Get(ctx, &part); err != nil {
+		// On failure, try to clean up temp files for this workflow
+		_ = workflow.ExecuteActivity(ctx, "Activities.CleanupScratch", types.CleanupParams{ScratchSubdir: p.ScratchSubdir}).Get(ctx, nil)
 		return types.MergeStats{}, err
 	}
 
@@ -46,6 +53,8 @@ func ZoneNamesWorkflow(ctx workflow.Context, p types.WorkflowParams) (types.Merg
 	}
 	for i := range futures {
 		if err := futures[i].Get(ctx, &stats[i]); err != nil {
+			// Cleanup on dedupe failure
+			_ = workflow.ExecuteActivity(ctx, "Activities.CleanupScratch", types.CleanupParams{ScratchSubdir: p.ScratchSubdir}).Get(ctx, nil)
 			return types.MergeStats{}, err
 		}
 	}
@@ -68,7 +77,14 @@ func ZoneNamesWorkflow(ctx workflow.Context, p types.WorkflowParams) (types.Merg
 
 	var ms types.MergeStats
 	if err := workflow.ExecuteActivity(mergeCtx, "Activities.MergeSortedAndWriteManifest", mp).Get(ctx, &ms); err != nil {
+		// Cleanup on merge failure
+		_ = workflow.ExecuteActivity(ctx, "Activities.CleanupScratch", types.CleanupParams{ScratchSubdir: p.ScratchSubdir}).Get(ctx, nil)
 		return types.MergeStats{}, err
+	}
+
+	// Success path: optionally cleanup unless user asked to keep scratch
+	if !p.KeepScratch {
+		_ = workflow.ExecuteActivity(ctx, "Activities.CleanupScratch", types.CleanupParams{ScratchSubdir: p.ScratchSubdir}).Get(ctx, nil)
 	}
 	return ms, nil
 }

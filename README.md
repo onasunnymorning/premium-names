@@ -81,7 +81,7 @@ Or invoke tctl directly (note the correct flag is --workflow_type):
 tctl workflow start \
   --taskqueue zone-names \
   --workflow_type ZoneNamesWorkflow \
-  --input '{"ZoneURI":"s3://zone-names/org/org.txt.gz","OutputURI":"s3://zone-names/org/names.txt","Shards":64,"Filters":["A","AAAA","CNAME"],"IDNMode":"none"}'
+  --input '{"ZoneURI":"s3://zone-names/org/org.txt.gz","OutputURI":"s3://zone-names/org/names.txt","Shards":64,"Filters":["A","AAAA","CNAME"],"IDNMode":"none","KeepScratch":false}'
 ```
 
 Tip: to avoid shell-escaping issues, use --input_file examples/request.example.json instead of --input.
@@ -90,7 +90,31 @@ Tip: to avoid shell-escaping issues, use --input_file examples/request.example.j
 Relies on default AWS credential chain (env, shared config, role, etc.).
 
 ### Notes
-- `ZN_TMP_DIR` must be a fast local disk with enough space.
+- `ZN_TMP_DIR` must be a fast local disk with enough space. In Docker (compose), the worker uses `/var/zone-names` by default; change via env.
 - To write to `file://` instead of S3, set `OutputURI` accordingly.
 - `IDNMode`: `alabel`, `ulabel`, or `none`.
 - `Filters` empty = include all types.
+
+## Scratch directory and cleanup
+
+- The worker writes temporary files under a scratch root (`ZN_TMP_DIR`).
+- Each workflow execution uses a subdirectory, defaulting to the Temporal `WorkflowId`. Example: `/tmp/zone-names/<workflow-id>/`.
+- You can override the subdirectory via the optional input field `ScratchSubdir`. If `ScratchSubdir` is empty or omitted, the workflow id is used.
+- Automatic cleanup:
+  - On success, the workflow deletes its scratch subdirectory by default.
+  - On any failure (partition, dedupe, merge), the workflow attempts to delete the subdirectory before returning an error.
+  - To keep artifacts for debugging, set `KeepScratch: true` in the input.
+
+Example `examples/request.example.json` fields:
+
+```json
+{
+  "ZoneURI": "s3://zone-names/net.txt.gz",
+  "OutputURI": "s3://zone-names/net.names.txt",
+  "Shards": 32,
+  "Filters": ["NS"],
+  "IDNMode": "none",
+  "ScratchSubdir": "",   
+  "KeepScratch": false     
+}
+```

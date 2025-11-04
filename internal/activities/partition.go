@@ -6,6 +6,7 @@ import (
 	"context"
 	"hash/fnv"
 	"io"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -56,13 +57,16 @@ func (a *Activities) StreamPartition(ctx context.Context, p types.WorkflowParams
 	wrs := make([]*bufio.Writer, shards)
 	closers := make([]io.Closer, shards)
 	for i := 0; i < shards; i++ {
-		path := filepath.Join(a.cfg.ScratchDir, "shard-%02d.txt")
-		path = strings.Replace(path, "%02d", two(i), 1)
-		w, c, err := iopkg.Create(path)
+		base := filepath.Join(a.cfg.ScratchDir, p.ScratchSubdir)
+		if err := os.MkdirAll(base, 0o755); err != nil {
+			return types.PartitionResult{}, err
+		}
+		fpath := filepath.Join(base, "shard-"+two(i)+".txt")
+		w, c, err := iopkg.Create(fpath)
 		if err != nil {
 			return types.PartitionResult{}, err
 		}
-		paths[i] = "file://" + path
+		paths[i] = "file://" + fpath
 		wrs[i] = bufio.NewWriterSize(w, 1<<20)
 		closers[i] = c
 	}

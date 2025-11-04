@@ -1,11 +1,16 @@
 package types
 
 type WorkflowParams struct {
-	ZoneURI   string   // file:// or s3://
-	OutputURI string   // where names.txt goes (same scheme); manifest.json at same prefix
+	ZoneURI   string // file:// or s3://
+	OutputURI string // where names.txt goes (same scheme); manifest.json at same prefix
 	Shards    int
 	Filters   []string // e.g. ["A","AAAA","CNAME"]
 	IDNMode   string   // "alabel"|"ulabel"|"none"
+	// Optional relative subdirectory under scratch root where this workflow writes temp files.
+	// If empty, activities may use the scratch root directly.
+	ScratchSubdir string
+	// If true, workflow will skip cleaning up the scratch subdir after completion/failure.
+	KeepScratch bool
 }
 
 type PartitionResult struct {
@@ -35,4 +40,9 @@ type MergeParams struct {
 }
 type MergeStats struct {
 	Emitted uint64
+}
+
+// CleanupParams instructs the cleanup activity which subdir to remove.
+type CleanupParams struct {
+	ScratchSubdir string
 }
