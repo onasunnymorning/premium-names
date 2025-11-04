@@ -44,6 +44,8 @@ func Serve(addr string) error {
 
 // AddrFromEnv returns listen address from METRICS_ADDR or default ":9090".
 func AddrFromEnv() string {
-	if v := os.Getenv("METRICS_ADDR"); v != "" { return v }
+	if v := os.Getenv("METRICS_ADDR"); v != "" {
+		return v
+	}
 	return ":9090"
 }

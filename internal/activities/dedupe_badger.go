@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"path/filepath"
+	"time"
 
 	"go.temporal.io/sdk/activity"
 
@@ -31,6 +32,7 @@ func (a *Activities) ShardDedupeBadger(ctx context.Context, p types.ShardDedupeP
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 1024), 1024*1024)
 	var total uint64
+	lastHB := time.Now()
 	for sc.Scan() {
 		k := append([]byte(nil), sc.Bytes()...)
 		err := db.Update(func(txn *badger.Txn) error {
@@ -44,8 +46,10 @@ func (a *Activities) ShardDedupeBadger(ctx context.Context, p types.ShardDedupeP
 			return types.ShardStats{}, err
 		}
 		total++
-		if total%20000 == 0 {
+		// Heartbeat frequently by count and also time-based as a safety net.
+		if total%5000 == 0 || time.Since(lastHB) > 10*time.Second {
 			activity.RecordHeartbeat(ctx, total)
+			lastHB = time.Now()
 		}
 	}
 	if err := sc.Err(); err != nil {
@@ -60,6 +64,9 @@ func (a *Activities) ShardDedupeBadger(ctx context.Context, p types.ShardDedupeP
 	bw := bufio.NewWriterSize(out, 1<<20)
 
 	var uniq uint64
+	// Continue to heartbeat while iterating and writing out uniques.
+	// This phase can be long on large shards, so keep the server updated.
+	lastHB = time.Now()
 	err = db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -73,6 +80,10 @@ func (a *Activities) ShardDedupeBadger(ctx context.Context, p types.ShardDedupeP
 				return err
 			}
 			uniq++
+			if uniq%10000 == 0 || time.Since(lastHB) > 10*time.Second {
+				activity.RecordHeartbeat(ctx, map[string]any{"total": total, "unique": uniq})
+				lastHB = time.Now()
+			}
 		}
 		return nil
 	})

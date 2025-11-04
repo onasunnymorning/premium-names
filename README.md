@@ -69,15 +69,22 @@ MinIO will auto-create a bucket named `zone-names` via the `minio-init` one-shot
 
 ## Start a workflow (example)
 
+Use the Makefile helper (tctl must be installed locally):
+
 ```bash
-tctl workflow start   --taskqueue zone-names   --workflow ZoneNamesWorkflow   --input '{ 
-    "ZoneURI":"s3://your-bucket/path/org.zone.gz",
-    "OutputURI":"s3://your-bucket/output/org/names.txt",
-    "Shards":64,
-    "Filters":["A","AAAA","CNAME"],
-    "IDNMode":"none"
-  }'
+make start-workflow START_INPUT=examples/request.example.json
 ```
+
+Or invoke tctl directly (note the correct flag is --workflow_type):
+
+```bash
+tctl workflow start \
+  --taskqueue zone-names \
+  --workflow_type ZoneNamesWorkflow \
+  --input '{"ZoneURI":"s3://zone-names/org/org.txt.gz","OutputURI":"s3://zone-names/org/names.txt","Shards":64,"Filters":["A","AAAA","CNAME"],"IDNMode":"none"}'
+```
+
+Tip: to avoid shell-escaping issues, use --input_file examples/request.example.json instead of --input.
 
 ### S3 credentials
 Relies on default AWS credential chain (env, shared config, role, etc.).

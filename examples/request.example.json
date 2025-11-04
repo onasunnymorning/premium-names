@@ -1,0 +1,7 @@
+{
+  "ZoneURI": "s3://zone-names/org.txt.gz",
+  "OutputURI": "s3://zone-names/names.txt",
+  "Shards": 32,
+  "Filters": ["NS"],
+  "IDNMode": "none"
+}

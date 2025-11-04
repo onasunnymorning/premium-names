@@ -131,7 +131,9 @@ func (a *Activities) StreamPartition(ctx context.Context, p types.WorkflowParams
 		}
 	}
 
-	if n > lastReported { znmetrics.RecordsPartitioned.Add(float64(n - lastReported)) }
+	if n > lastReported {
+		znmetrics.RecordsPartitioned.Add(float64(n - lastReported))
+	}
 	for _, bw := range wrs {
 		_ = bw.Flush()
 	}

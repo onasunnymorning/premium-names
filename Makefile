@@ -52,7 +52,8 @@ build: $(BIN)
 test: ## Run all unit tests
 	go test ./...
 
- tidy: ## Update go.sum and tidy modules
+
+tidy: ## Update go.sum and tidy modules
 	go mod tidy
 
 docker-build: ## Build the worker container image
@@ -79,7 +80,9 @@ clean: ## Remove built artifacts
 	rm -rf $(BIN_DIR)
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@grep -hE '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+	| awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-24s\033[0m %s\n", $$1, $$2}' \
+	| sort
 
 # ---- Dev stack (docker compose) ----
 .PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-restart
@@ -95,3 +98,10 @@ dev-worker-logs: ## Tail only the worker service logs
 	docker compose logs -f --tail=200 worker
 dev-restart: ## Rebuild and restart just the worker service
 	docker compose up -d --build worker
+
+# ---- Workflow helpers ----
+.PHONY: start-workflow
+# Start the ZoneNamesWorkflow using tctl on your host. Override START_INPUT to point at a JSON file.
+START_INPUT ?= examples/request.example.json
+start-workflow: ## Start the ZoneNamesWorkflow with tctl using --input_file
+	tctl workflow start --taskqueue $(TEMPORAL_TASK_QUEUE) --workflow_type ZoneNamesWorkflow --input_file $(START_INPUT)
