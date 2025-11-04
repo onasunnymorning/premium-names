@@ -11,7 +11,7 @@ import (
 	"github.com/yourorg/zone-names/internal/types"
 )
 
-func ZoneNamesWorkflow(ctx workflow.Context, p types.WorkflowParams) (types.MergeStats, error) {
+func Zone2NamesWorkflow(ctx workflow.Context, p types.WorkflowParams) (types.MergeStats, error) {
 	ao := workflow.ActivityOptions{
 		StartToCloseTimeout: 4 * time.Hour,
 		HeartbeatTimeout:    1 * time.Minute,

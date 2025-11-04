@@ -48,7 +48,7 @@ func main() {
 	w.RegisterActivityWithOptions(acts.ShardDedupeBadger, tactivity.RegisterOptions{Name: "Activities.ShardDedupeBadger"})
 	w.RegisterActivityWithOptions(acts.MergeSortedAndWriteManifest, tactivity.RegisterOptions{Name: "Activities.MergeSortedAndWriteManifest"})
 	w.RegisterActivityWithOptions(acts.CleanupScratch, tactivity.RegisterOptions{Name: "Activities.CleanupScratch"})
-	w.RegisterWorkflow(workflow.ZoneNamesWorkflow)
+	w.RegisterWorkflow(workflow.Zone2NamesWorkflow)
 
 	zl.Info("worker started", zap.String("namespace", ns), zap.String("taskQueue", q), zap.String("tmp", tmpDir), zap.String("metrics", getenv("METRICS_ADDR", ":9090")))
 	if err := w.Run(worker.InterruptCh()); err != nil {

@@ -80,7 +80,7 @@ Or invoke tctl directly (note the correct flag is --workflow_type):
 ```bash
 tctl workflow start \
   --taskqueue zone-names \
-  --workflow_type ZoneNamesWorkflow \
+  --workflow_type Zone2NamesWorkflow \
   --input '{"ZoneURI":"s3://zone-names/org/org.txt.gz","OutputURI":"s3://zone-names/org/names.txt","Shards":64,"Filters":["A","AAAA","CNAME"],"IDNMode":"none","KeepScratch":false}'
 ```
 

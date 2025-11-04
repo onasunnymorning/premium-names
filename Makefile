@@ -101,7 +101,8 @@ dev-restart: ## Rebuild and restart just the worker service
 
 # ---- Workflow helpers ----
 .PHONY: start-workflow
-# Start the ZoneNamesWorkflow using tctl on your host. Override START_INPUT to point at a JSON file.
+# Start the Zone2NamesWorkflow using tctl on your host. Override START_INPUT to point at a JSON file.
 START_INPUT ?= examples/request.example.json
-start-workflow: ## Start the ZoneNamesWorkflow with tctl using --input_file
-	tctl workflow start --taskqueue $(TEMPORAL_TASK_QUEUE) --workflow_type ZoneNamesWorkflow --input_file $(START_INPUT)
+start-workflow: ## Start the Zone2NamesWorkflow with tctl using --input_file
+	# NOTE: The workflow type is the Go function name registered in the worker
+	tctl workflow start --taskqueue $(TEMPORAL_TASK_QUEUE) --workflow_type Zone2NamesWorkflow --input_file $(START_INPUT)
