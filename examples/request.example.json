@@ -1,9 +1,9 @@
 {
   "ZoneURI": "s3://zone-names/net.txt.gz",
   "OutputURI": "s3://zone-names/net.names.txt",
-  "Shards": 32, // Number of shards to split the zone file into for parallel processing
-  "Filters": ["NS"], // List of DNS record types to include (e.g., ["A", "AAAA", "CNAME", "NS"])
-  "IDNMode": "none", // "alabel"|"ulabel"|"none" - how to handle Internationalized Domain Names
-  "ScratchSubdir": "",   // Defaults to the workflow ID when empty
-  "KeepScratch": false     // Whether to keep the scratch directory after completion (use with caution, you can fill up disk space)
+  "Shards": 32,
+  "Filters": ["NS"],
+  "IDNMode": "none",
+  "ScratchSubdir": "",
+  "KeepScratch": false
 }
