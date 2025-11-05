@@ -67,6 +67,47 @@ export AWS_ENDPOINT_URL_S3=http://localhost:9000
 
 MinIO will auto-create a bucket named `zone-names` via the `minio-init` one-shot job. The worker exposes Prometheus metrics at http://localhost:9090/metrics when running under compose.
 
+## HTTP API
+
+The dev stack also includes a small HTTP API (Gin) exposing CRUD and list endpoints for batches, labels, and tags backed by Postgres.
+
+- Base URL: http://localhost:8081/api
+- Start via compose: `make dev-up` (the `api` service is part of the stack)
+
+Endpoints (selection):
+- POST /api/batches — create a batch
+- GET /api/labels — list labels filtered by tags and/or batch: `?tags=tag1,tag2&mode=any|all&batch=123&limit=100&offset=0`
+- POST /api/labels/:id/tags — add a tag to a label
+- DELETE /api/labels/:id/tags/:tagId — remove a tag from a label
+- POST /api/labels/tags/apply — bulk-apply a tag to labels matching a filter
+- GET /api/tags?prefix=ca&limit=20 — type-ahead search for tags
+- POST /api/tags — create a tag
+- PATCH /api/tags/:id — rename a tag and/or change group
+- DELETE /api/tags/:id — delete a tag
+- GET /api/export — CSV export of labels matching a filter
+
+Notes:
+- The API service waits for database migrations to complete.
+- Default port is 8081; override with `PORT`.
+- Upload and import:
+  - POST `/api/batches/{id}/upload` (multipart/form-data, field `file`) uploads to S3/MinIO and enqueues an import job.
+  - An `importer` service consumes jobs and processes files.
+  - OpenAPI: http://localhost:8081/api/openapi.yaml
+
+### Upload/import pipeline
+
+- Supported input formats: CSV, TSV, TXT, XLSX, XLS (first column is the domain; other columns ignored)
+- Tolerant of “dirty” data:
+  - Skips empty lines and obvious header rows
+  - Handles quoted newlines, variable column counts (CSV/TSV)
+  - Normalizes to first label of domain, IDNA punycode, LDH rules
+  - In-file dedupe on normalized ASCII label
+
+Processing steps:
+1) Upload via `/api/batches/{id}/upload`. File is stored at `s3://$IMPORT_BUCKET/uploads/batch-{id}/...`.
+2) Importer downloads, parses first column, normalizes, upserts labels.
+3) Bulk links labels to the batch via COPY for high throughput.
+
 ## Start a workflow (example)
 
 Use the Makefile helper (tctl must be installed locally):
@@ -118,3 +159,97 @@ Example `examples/request.example.json` fields:
   "KeepScratch": false     
 }
 ```
+
+## Local development quick reference
+
+- Start stack (Temporal, UI, MinIO, Postgres, API, worker, importer):
+
+```bash
+make dev-up
+```
+
+- Tail logs:
+
+```bash
+make dev-logs              # all services
+make dev-api-logs          # API only
+make dev-worker-logs       # worker only
+make dev-importer-logs     # importer only
+```
+
+- Rebuild one service in compose:
+
+```bash
+make dev-restart-api
+make dev-restart-importer
+```
+
+- Run locally (outside Docker):
+
+```bash
+# API
+make run-api
+
+# Importer
+make run-importer
+```
+
+- Migrations (compose-backed):
+
+```bash
+make migrate-up                  # apply up to latest
+make migrate-down                # roll back one step
+MIGRATE_OPTS=-all make migrate-down  # roll back all
+```
+
+### Required env (compose defaults)
+
+Database:
+
+```bash
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=temporal
+export DB_PASSWORD=temporal
+export DB_NAME=premium_names
+export DB_SSLMODE=disable
+```
+
+S3/MinIO:
+
+```bash
+export AWS_ACCESS_KEY_ID=minioadmin
+export AWS_SECRET_ACCESS_KEY=minioadmin
+export AWS_REGION=us-east-1
+export AWS_ENDPOINT_URL_S3=http://localhost:9000
+export AWS_S3_FORCE_PATH_STYLE=true
+export IMPORT_BUCKET=zone-names
+```
+
+## Frontend (Next.js UI)
+
+A lightweight Next.js app provides a simple UI to:
+- Browse labels with filters (tags ANY/ALL, optional batch id), export CSV, and bulk-apply a tag to the current result set
+- Manage tags (create, rename, delete) with type-ahead search
+- Create a batch and upload a file to kick off an import job
+
+Getting started:
+
+```bash
+# In another terminal, keep the backend stack running
+make dev-up
+
+# Run the frontend (installs deps on first run)
+make dev-frontend
+```
+
+Then open http://localhost:3000.
+
+Configuration:
+
+- The frontend reads the API base from `NEXT_PUBLIC_API_BASE` (defaults to `http://localhost:8081`).
+- You can copy `frontend/.env.example` to `frontend/.env.local` and customize it if needed.
+
+Notes:
+- File uploads go directly to the backend API endpoint `/api/batches/:id/upload` using `multipart/form-data`.
+- CORS is enabled in the API for local development.

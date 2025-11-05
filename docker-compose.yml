@@ -23,6 +23,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # One-shot init to create the application database (premium_names)
+  db-init:
+    image: postgres:15
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      'echo "Ensuring app database exists..." &&
+       PGPASSWORD=$$POSTGRES_PASSWORD psql -h postgres -U $$POSTGRES_USER -d postgres -v ON_ERROR_STOP=1 -c "CREATE DATABASE premium_names WITH OWNER $$POSTGRES_USER;" 2>/dev/null || echo "Database premium_names already exists"'
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    restart: "no"
+
   temporal:
     image: temporalio/auto-setup:1.25.0
     depends_on:
@@ -63,10 +78,21 @@ services:
       timeout: 3s
       retries: 20
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # Web console
+      - "${MINIO_HOST_PORT:-9000}:9000" # S3 API
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001" # Web console
     volumes:
       - minio-data:/data
+
+  # Run SQL migrations against the app database before any app service
+  migrator:
+    image: migrate/migrate:latest
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "postgres://temporal:temporal@postgres:5432/premium_names?sslmode=disable", "up"]
+    restart: "no"
 
   worker:
     build:
@@ -78,6 +104,8 @@ services:
         condition: service_started
       minio:
         condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
@@ -85,10 +113,67 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       AWS_ENDPOINT_URL_S3: http://minio:9000
       AWS_S3_FORCE_PATH_STYLE: "true"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: temporal
+      DB_PASSWORD: temporal
+      DB_NAME: premium_names
+      DB_SSLMODE: disable
     volumes:
       - worker-tmp:/var/zone-names
     ports:
       - "9090:9090" # metrics
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zone-names-api:dev
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: temporal
+      DB_PASSWORD: temporal
+      DB_NAME: premium_names
+      DB_SSLMODE: disable
+      PORT: "8081"
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      AWS_REGION: us-east-1
+      IMPORT_BUCKET: zone-names
+    entrypoint: ["/api"]
+    ports:
+      - "8081:8081"
+  importer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: zone-names-importer:dev
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: temporal
+      DB_PASSWORD: temporal
+      DB_NAME: premium_names
+      DB_SSLMODE: disable
+      AWS_ENDPOINT_URL_S3: http://minio:9000
+      AWS_S3_FORCE_PATH_STYLE: "true"
+      AWS_REGION: us-east-1
+      IMPORT_BUCKET: zone-names
+    entrypoint: ["/importer"]
     restart: unless-stopped
 
   # Optional one-shot service to create a default bucket on first run

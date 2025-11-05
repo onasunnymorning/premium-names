@@ -1,0 +1,368 @@
+openapi: 3.1.0
+info:
+  title: Premium Names API
+  version: 0.1.0
+  description: HTTP API for batches, labels, and tags.
+servers:
+  - url: http://localhost:8081
+paths:
+  /api/batches:
+    post:
+      summary: Create a batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                source_filename:
+                  type: string
+                  nullable: true
+                created_by:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Batch created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+  /api/batches/{id}/upload:
+    post:
+      summary: Upload a file and enqueue an import job for a batch
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Job enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+  /api/labels:
+    get:
+      summary: List labels
+      parameters:
+        - in: query
+          name: tags
+          schema:
+            type: string
+          description: Comma-separated tag names
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [any, all]
+          description: Filter mode across tags
+        - in: query
+          name: batch
+          schema:
+            type: integer
+            format: int64
+          description: Batch ID
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 100
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Labels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Label'
+  /api/labels/{id}/tags:
+    post:
+      summary: Add a tag to a label
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tagId]
+              properties:
+                tagId:
+                  type: integer
+                  format: int64
+                addedBy:
+                  type: string
+                  nullable: true
+      responses:
+        '204':
+          description: Tag added
+  /api/labels/{id}/tags/{tagId}:
+    delete:
+      summary: Remove a tag from a label
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - in: path
+          name: tagId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Tag removed
+  /api/labels/tags/apply:
+    post:
+      summary: Apply a tag to labels matching a filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tagId]
+              properties:
+                tagId:
+                  type: integer
+                  format: int64
+                addedBy:
+                  type: string
+                  nullable: true
+                filter:
+                  $ref: '#/components/schemas/LabelListFilter'
+      responses:
+        '200':
+          description: Count of labels updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added:
+                    type: integer
+  /api/tags:
+    get:
+      summary: Type-ahead tags
+      parameters:
+        - in: query
+          name: prefix
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Tags
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+    post:
+      summary: Create a tag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                groupName:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+  /api/tags/{id}:
+    patch:
+      summary: Rename a tag and/or update group
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  nullable: true
+                groupName:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Tag updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+    delete:
+      summary: Delete a tag
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Tag deleted
+  /api/export:
+    get:
+      summary: Export labels as CSV
+      parameters:
+        - in: query
+          name: tags
+          schema:
+            type: string
+        - in: query
+          name: mode
+          schema:
+            type: string
+            enum: [any, all]
+        - in: query
+          name: batch
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+components:
+  schemas:
+    Job:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        batch_id:
+          type: integer
+          format: int64
+        object_uri:
+          type: string
+        status:
+          type: string
+        error:
+          type: string
+          nullable: true
+    Label:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        label_ascii:
+          type: string
+        label_unicode:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        groupName:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    Batch:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        source_filename:
+          type: string
+          nullable: true
+        created_by:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    LabelListFilter:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        mode:
+          type: string
+          enum: [any, all]
+        batch:
+          type: integer
+          format: int64
+          nullable: true
+        limit:
+          type: integer
+        offset:
+          type: integer

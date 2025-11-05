@@ -14,6 +14,19 @@ BIN_DIR        ?= bin
 BIN            ?= $(BIN_DIR)/worker
 PKG            ?= ./cmd/worker
 
+# Database defaults for local runs
+DB_HOST    ?= localhost
+DB_PORT    ?= 5432
+DB_USER    ?= temporal
+DB_PASSWORD?= temporal
+DB_NAME    ?= premium_names
+DB_SSLMODE ?= disable
+
+# S3/MinIO defaults for local runs
+AWS_ENDPOINT_URL_S3   ?= http://localhost:9000
+AWS_S3_FORCE_PATH_STYLE?= true
+IMPORT_BUCKET         ?= zone-names
+
 # Temporal defaults (override at invocation)
 # Temporal / Worker defaults (can be provided via .env)
 TEMPORAL_TARGET_HOST ?= 127.0.0.1:7233
@@ -39,7 +52,7 @@ AWS_ENV = \
 # Use .env for docker run if present
 DOCKER_ENV_FILE := $(if $(wildcard .env),--env-file .env,)
 
-.PHONY: all build test docker-build docker-push docker-run clean tidy
+.PHONY: all build test docker-build docker-push docker-run clean tidy lint
 
 all: build
 
@@ -55,6 +68,10 @@ test: ## Run all unit tests
 
 tidy: ## Update go.sum and tidy modules
 	go mod tidy
+
+lint: ## Run vet and format checks
+	go vet ./...
+	@FMT_OUT=$$(gofmt -s -l .); if [ -n "$$FMT_OUT" ]; then echo "Files need gofmt -s:"; echo "$$FMT_OUT"; exit 1; fi
 
 docker-build: ## Build the worker container image
 	docker buildx build --platform=$(DOCKER_PLATFORM) -t $(IMAGE):$(TAG) .
@@ -85,7 +102,7 @@ help: ## Show this help
 	| sort
 
 # ---- Dev stack (docker compose) ----
-.PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-restart
+.PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-api-logs dev-importer-logs dev-restart dev-restart-api dev-restart-importer dev-frontend
 dev-up: ## Start Temporal, UI, MinIO, and worker via docker compose (build if needed)
 	docker compose up -d --build
 dev-down: ## Stop and remove the dev stack
@@ -98,6 +115,38 @@ dev-worker-logs: ## Tail only the worker service logs
 	docker compose logs -f --tail=200 worker
 dev-restart: ## Rebuild and restart just the worker service
 	docker compose up -d --build worker
+
+dev-api-logs: ## Tail only the api service logs
+	docker compose logs -f --tail=200 api
+dev-restart-api: ## Rebuild and restart just the api service
+	docker compose up -d --build api
+
+dev-importer-logs: ## Tail only the importer service logs
+	docker compose logs -f --tail=200 importer
+dev-restart-importer: ## Rebuild and restart just the importer service
+	docker compose up -d --build importer
+
+dev-frontend: ## Run the Next.js frontend in ./frontend (installs deps on first run)
+	cd frontend && [ -d node_modules ] || npm install
+	cd frontend && npm run dev
+
+# ---- DB migrations (using compose migrator) ----
+.PHONY: migrate-up migrate-down
+migrate-up: ## Apply SQL migrations up to latest using compose migrator
+	docker compose run --rm migrator -path /migrations -database "postgres://$${DB_USER:-temporal}:$${DB_PASSWORD:-temporal}@postgres:5432/$${DB_NAME:-premium_names}?sslmode=disable" up
+migrate-down: ## Roll back one migration (or add -all via MIGRATE_OPTS)
+	docker compose run --rm migrator -path /migrations -database "postgres://$${DB_USER:-temporal}:$${DB_PASSWORD:-temporal}@postgres:5432/$${DB_NAME:-premium_names}?sslmode=disable" down $${MIGRATE_OPTS}
+
+# ---- Run API and Importer locally ----
+.PHONY: run-api run-importer
+run-api: ## Run API locally (go run)
+	DB_HOST=$(DB_HOST) DB_PORT=$(DB_PORT) DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_NAME=$(DB_NAME) DB_SSLMODE=$(DB_SSLMODE) \
+	AWS_ENDPOINT_URL_S3=$(AWS_ENDPOINT_URL_S3) AWS_S3_FORCE_PATH_STYLE=$(AWS_S3_FORCE_PATH_STYLE) IMPORT_BUCKET=$(IMPORT_BUCKET) \
+	PORT=8081 go run ./cmd/api
+run-importer: ## Run Importer locally (go run)
+	DB_HOST=$(DB_HOST) DB_PORT=$(DB_PORT) DB_USER=$(DB_USER) DB_PASSWORD=$(DB_PASSWORD) DB_NAME=$(DB_NAME) DB_SSLMODE=$(DB_SSLMODE) \
+	AWS_ENDPOINT_URL_S3=$(AWS_ENDPOINT_URL_S3) AWS_S3_FORCE_PATH_STYLE=$(AWS_S3_FORCE_PATH_STYLE) IMPORT_BUCKET=$(IMPORT_BUCKET) \
+	go run ./cmd/importer
 
 # ---- Workflow helpers ----
 .PHONY: start-workflow
