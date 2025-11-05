@@ -85,7 +85,7 @@ help: ## Show this help
 	| sort
 
 # ---- Dev stack (docker compose) ----
-.PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-restart
+.PHONY: dev-up dev-down dev-logs dev-ps dev-worker-logs dev-restart dev-frontend
 dev-up: ## Start Temporal, UI, MinIO, and worker via docker compose (build if needed)
 	docker compose up -d --build
 dev-down: ## Stop and remove the dev stack
@@ -98,11 +98,19 @@ dev-worker-logs: ## Tail only the worker service logs
 	docker compose logs -f --tail=200 worker
 dev-restart: ## Rebuild and restart just the worker service
 	docker compose up -d --build worker
+dev-frontend: ## Start the Next.js frontend development server
+	cd frontend && npm run dev -- --port 3000
 
 # ---- Workflow helpers ----
-.PHONY: start-workflow
+.PHONY: start-workflow start-domain-labels-workflow
 # Start the Zone2NamesWorkflow using tctl on your host. Override START_INPUT to point at a JSON file.
 START_INPUT ?= examples/request.example.json
 start-workflow: ## Start the Zone2NamesWorkflow with tctl using --input_file
 	# NOTE: The workflow type is the Go function name registered in the worker
 	tctl workflow start --taskqueue $(TEMPORAL_TASK_QUEUE) --workflow_type Zone2NamesWorkflow --input_file $(START_INPUT)
+
+# Start the DomainLabelsWorkflow using tctl. Override DOMAIN_INPUT to point at a JSON file.
+DOMAIN_INPUT ?= examples/domain-labels.example.json
+start-domain-labels-workflow: ## Start the DomainLabelsWorkflow with tctl using --input_file
+	# NOTE: The workflow type is the Go function name registered in the worker
+	tctl workflow start --taskqueue $(TEMPORAL_TASK_QUEUE) --workflow_type DomainLabelsWorkflow --input_file $(DOMAIN_INPUT)

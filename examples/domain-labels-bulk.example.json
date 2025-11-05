@@ -1,0 +1,6 @@
+{
+  "file_uri": "s3://bulk-imports/tld-analysis/net-zone-sample.tsv",
+  "tags": ["tld-analysis", "net", "zone-file", "bulk-import"],
+  "created_by": "system@centralnic.com",
+  "description": "Automated .NET TLD zone file analysis - extracting premium candidates"
+}

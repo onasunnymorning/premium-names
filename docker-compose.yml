@@ -71,7 +71,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.worker
     image: zone-names-worker:dev
     depends_on:
       temporal:
@@ -85,6 +85,9 @@ services:
       TEMPORAL_ADDRESS: temporal:7233
       AWS_ENDPOINT_URL_S3: http://minio:9000
       AWS_S3_FORCE_PATH_STYLE: "true"
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-admin}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-minioadmin}
+      AWS_REGION: us-east-1
     volumes:
       - worker-tmp:/var/zone-names
     ports:
@@ -108,7 +111,63 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     restart: "no"
 
+  # Additional services for the label management system
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8081:8080"  # Use 8081 externally to avoid conflicts
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=domain_labels
+      - DB_SSLMODE=disable
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      db:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+    volumes:
+      - .:/app
+      - /app/bin
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: domain_labels
+    ports:
+      - "5433:5432"  # Use 5433 externally to avoid conflicts with main postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8081/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - api
+
 volumes:
   pgdata: {}
   minio-data: {}
   worker-tmp: {}
+  postgres_data: {}

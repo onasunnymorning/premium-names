@@ -1,6 +1,6 @@
 {
-  "ZoneURI": "s3://zone-names/com.txt.gz",
-  "OutputURI": "s3://zone-names/com.names.txt",
+  "ZoneURI": "s3://zone-names/net.txt.gz",
+  "OutputURI": "s3://zone-names/net.names.txt",
   "Shards": 32,
   "Filters": ["NS"],
   "IDNMode": "none",

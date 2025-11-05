@@ -1,0 +1,6 @@
+{
+  "file_uri": "s3://zone-names/net.names.txt",
+  "tags": ["premium", "november-2025", "example"],
+  "created_by": "Geoff@me",
+  "description": "dotnet names"
+}

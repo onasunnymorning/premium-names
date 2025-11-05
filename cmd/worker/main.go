@@ -43,12 +43,19 @@ func main() {
 
 	w := worker.New(c, q, worker.Options{})
 	acts := activities.New(activities.Config{ScratchDir: tmpDir})
-	// Register activities with explicit names matching workflow.ExecuteActivity calls
+	// Register zone processing activities with explicit names matching workflow.ExecuteActivity calls
 	w.RegisterActivityWithOptions(acts.StreamPartition, tactivity.RegisterOptions{Name: "Activities.StreamPartition"})
 	w.RegisterActivityWithOptions(acts.ShardDedupeBadger, tactivity.RegisterOptions{Name: "Activities.ShardDedupeBadger"})
 	w.RegisterActivityWithOptions(acts.MergeSortedAndWriteManifest, tactivity.RegisterOptions{Name: "Activities.MergeSortedAndWriteManifest"})
 	w.RegisterActivityWithOptions(acts.CleanupScratch, tactivity.RegisterOptions{Name: "Activities.CleanupScratch"})
+
+	// Register domain label processing activities
+	w.RegisterActivityWithOptions(acts.ParseDomainLabelFile, tactivity.RegisterOptions{Name: "Activities.ParseDomainLabelFile"})
+	w.RegisterActivityWithOptions(acts.SaveDomainLabels, tactivity.RegisterOptions{Name: "Activities.SaveDomainLabels"})
+
+	// Register workflows
 	w.RegisterWorkflow(workflow.Zone2NamesWorkflow)
+	w.RegisterWorkflow(workflow.DomainLabelsWorkflow)
 
 	zl.Info("worker started", zap.String("namespace", ns), zap.String("taskQueue", q), zap.String("tmp", tmpDir), zap.String("metrics", getenv("METRICS_ADDR", ":9090")))
 	if err := w.Run(worker.InterruptCh()); err != nil {

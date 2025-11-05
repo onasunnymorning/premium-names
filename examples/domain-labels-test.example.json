@@ -1,0 +1,6 @@
+{
+  "file_uri": "file:///tmp/test-domains.txt",
+  "tags": ["test", "example", "local"],
+  "created_by": "admin@example.com",
+  "description": "Simple test with local file"
+}

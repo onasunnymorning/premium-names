@@ -1,0 +1,6 @@
+domain,type,category
+example,premium,test
+test-site,standard,development
+https://my-app.com,premium,production
+sub.domain.org,standard,subdomain
+premium-name,premium,exclusive

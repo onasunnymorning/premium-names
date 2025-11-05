@@ -46,3 +46,30 @@ type MergeStats struct {
 type CleanupParams struct {
 	ScratchSubdir string
 }
+
+// DomainLabelWorkflowParams defines the input for processing domain label files
+type DomainLabelWorkflowParams struct {
+	FileURI     string   `json:"file_uri"`    // file:// or s3:// path to the input file
+	Tags        []string `json:"tags"`        // tags to apply to all processed labels
+	CreatedBy   string   `json:"created_by"`  // email/user who created these labels
+	Description string   `json:"description"` // optional description for this batch
+}
+
+// DomainLabelProcessResult contains the results of processing domain labels
+type DomainLabelProcessResult struct {
+	ProcessedCount int                    `json:"processed_count"` // total rows processed
+	SavedCount     int                    `json:"saved_count"`     // labels successfully saved
+	SkippedCount   int                    `json:"skipped_count"`   // invalid/duplicate labels skipped
+	ErrorCount     int                    `json:"error_count"`     // processing errors
+	Labels         []ProcessedDomainLabel `json:"labels"`          // list of processed labels
+	Errors         []string               `json:"errors"`          // list of processing errors
+}
+
+// ProcessedDomainLabel represents a single processed domain label
+type ProcessedDomainLabel struct {
+	ID       uint     `json:"id"`       // database ID if saved
+	Label    string   `json:"label"`    // normalized domain label
+	Original string   `json:"original"` // original input from file
+	Tags     []string `json:"tags"`     // assigned tag names
+	Created  bool     `json:"created"`  // true if newly created, false if existed
+}
